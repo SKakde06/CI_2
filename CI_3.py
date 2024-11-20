@@ -5,15 +5,22 @@ def install(package):
     """Install a package using pip"""
     subprocess.check_call([sys.executable, "-m", "pip", "install", package])
 
-# Try to import required packages, install if not available
+# First, ensure Streamlit is available
+try:
+    import streamlit as st
+except ImportError:
+    print("Installing Streamlit. Please wait...")
+    install('streamlit')
+    import streamlit as st
+
+# Now handle scikit-learn installation
 try:
     import sklearn
 except ImportError:
-    st.warning("Installing scikit-learn. This may take a moment...")
+    st.sidebar.warning("Installing scikit-learn. This may take a moment...")
     install('scikit-learn')
     import sklearn
 
-import streamlit as st
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -85,12 +92,18 @@ def train_and_evaluate_model(X_scaled, y):
     return model, metrics, X_test, y_test, y_pred
 
 def main():
+    st.set_page_config(page_title="Customer Analysis", layout="wide")
+    
     st.title('Customer Purchasing Behavior Analysis')
 
     # Load data
     st.header('Data Overview')
     data = load_data()
     st.dataframe(data.head())
+
+    # Add a sidebar for additional information
+    st.sidebar.header('App Information')
+    st.sidebar.info('This app analyzes customer purchasing behavior using machine learning.')
 
     # Preprocess data
     st.header('Data Preprocessing')
