@@ -1,22 +1,3 @@
-import sys
-import subprocess
-
-def install(package):
-    subprocess.check_call([sys.executable, "-m", "pip", "install", package])
-
-# Install required packages
-required_packages = [
-    'streamlit', 'pandas', 'numpy', 'matplotlib', 'seaborn', 
-    'scikit-learn'
-]
-
-for package in required_packages:
-    try:
-        __import__(package)
-    except ImportError:
-        print(f"Installing {package}...")
-        install(package)
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -30,13 +11,37 @@ from sklearn.metrics import (
 )
 
 # Matplotlib import with error handling
-try:
-    import matplotlib
-    matplotlib.use('Agg')  # Use non-interactive backend
-    import matplotlib.pyplot as plt
-except ImportError:
-    st.error("Matplotlib could not be imported. Some visualizations may not work.")
-    plt = None
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
+import matplotlib.pyplot as plt
+
+def display_dataframe_info(df):
+    """
+    Custom function to display DataFrame info in Streamlit
+    """
+    # Capture info in a string buffer
+    buffer = []
+    
+    # Columns info
+    buffer.append("### Columns Information")
+    buffer.append(f"Total Columns: {len(df.columns)}")
+    
+    # Data types
+    buffer.append("\n### Column Data Types")
+    for col, dtype in df.dtypes.items():
+        buffer.append(f"- {col}: {dtype}")
+    
+    # Non-null counts
+    buffer.append("\n### Non-Null Counts")
+    for col in df.columns:
+        non_null_count = df[col].count()
+        total_count = len(df)
+        buffer.append(f"- {col}: {non_null_count} non-null out of {total_count} total")
+    
+    # Memory usage
+    buffer.append(f"\n### Memory Usage: {df.memory_usage(deep=True).sum() / 1024**2:.2f} MB")
+    
+    return "\n".join(buffer)
 
 def main():
     st.set_page_config(page_title="Customer Analysis", layout="wide")
@@ -66,12 +71,19 @@ def main():
             
             with col2:
                 st.subheader('Dataset Info')
-                buffer = []
-                data.info(buf=buffer)
-                info_str = "\n".join(buffer)
-                st.text(info_str)
+                # Use custom info display function
+                st.markdown(display_dataframe_info(data))
 
             # Preprocessing
+            # Verify required columns exist
+            required_columns = ['user_id', 'purchase_amount', 'region']
+            missing_columns = [col for col in required_columns if col not in data.columns]
+            
+            if missing_columns:
+                st.error(f"Missing required columns: {missing_columns}")
+                st.stop()
+
+            # Create high_spender feature
             data['high_spender'] = (data['purchase_amount'] > 300).astype(int)
             data = data.drop(columns=['user_id', 'purchase_amount'])
 
@@ -114,16 +126,13 @@ def main():
             st.header('🔍 Model Visualization')
             
             # Confusion Matrix
-            if plt:
-                fig, ax = plt.subplots(figsize=(8, 6))
-                cm = confusion_matrix(y_test, y_pred)
-                sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax)
-                ax.set_title('Confusion Matrix')
-                ax.set_xlabel('Predicted Label')
-                ax.set_ylabel('True Label')
-                st.pyplot(fig)
-            else:
-                st.warning("Matplotlib visualization unavailable")
+            fig, ax = plt.subplots(figsize=(8, 6))
+            cm = confusion_matrix(y_test, y_pred)
+            sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax)
+            ax.set_title('Confusion Matrix')
+            ax.set_xlabel('Predicted Label')
+            ax.set_ylabel('True Label')
+            st.pyplot(fig)
 
             # Classification Report
             st.header('📋 Classification Report')
@@ -131,6 +140,9 @@ def main():
 
         except Exception as e:
             st.error(f"An error occurred: {e}")
+            # Optionally, print full traceback for debugging
+            import traceback
+            st.error(traceback.format_exc())
     else:
         st.info("Please upload a CSV file to begin analysis")
 
